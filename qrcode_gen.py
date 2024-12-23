@@ -47,7 +47,7 @@ def add_error_correction(dec_list, total_codewords):
     bin_str = ''.join(format(byte, '08b') for byte in encoded_data)
     return bin_str
 
-
+# 0 = 2; 1 = 3
 def create_alignment_matrix():
     size = 29  # Calculate matrix size
     matrix = [[None for _ in range(size)] for _ in range(size)]
@@ -59,13 +59,13 @@ def create_alignment_matrix():
                 if 0 <= row + r < size and 0 <= col + c < size:
                     if 0 <= r <= 6 and 0 <= c <= 6:  # Finder pattern area
                         if 2 <= r <= 4 and 2 <= c <= 4:  # Center 3x3 block
-                            matrix[row + r][col + c] = 1
+                            matrix[row + r][col + c] = 3
                         elif r in {0, 6} or c in {0, 6}:  # Outer dark border
-                            matrix[row + r][col + c] = 1
+                            matrix[row + r][col + c] = 3
                         else:  # White area
-                            matrix[row + r][col + c] = 0
+                            matrix[row + r][col + c] = 2
                     else:  # Border around the finder
-                        matrix[row + r][col + c] = 0
+                        matrix[row + r][col + c] = 2
 
     add_finder_pattern(0, 0)  # Top-left
     add_finder_pattern(0, size - 7)  # Top-right
@@ -73,27 +73,34 @@ def create_alignment_matrix():
 
     # Add timing patterns
     for i in range(8, size - 8):
-        matrix[6][i] = 1 if i % 2 == 0 else 0  # Horizontal
-        matrix[i][6] = 1 if i % 2 == 0 else 0  # Vertical
+        matrix[6][i] = 3 if i % 2 == 0 else 2  # Horizontal
+        matrix[i][6] = 3 if i % 2 == 0 else 2  # Vertical
 
     # Add alignment pattern (for Version 3, one at [22, 22])
     for r in range(-2, 3):
         for c in range(-2, 3):
             if 0 <= 22 + r < size and 0 <= 22 + c < size:
                 if r == 0 and c == 0:  # Center
-                    matrix[22 + r][22 + c] = 1
+                    matrix[22 + r][22 + c] = 3
                 elif r in {-2, 2} or c in {-2, 2}:  # Outer square
-                    matrix[22 + r][22 + c] = 1
+                    matrix[22 + r][22 + c] = 3
                 else:  # White area
-                    matrix[22 + r][22 + c] = 0
+                    matrix[22 + r][22 + c] = 2
 
     #add_alignment_pattern(22, 22)
 
     # Dark pixel
-    matrix[21][8] = 1
+    matrix[21][8] = 3
 
     # Add format information
-    format_data = "111011111000100"
+    l_zero = "111011111000100"
+    l_one =  "111001011110011"
+    #format_data = "333233333222322"
+    current_mask = l_one
+
+    int_fd = [int(char) + 2 for char in current_mask]
+    format_data = ''.join(str(num) for num in int_fd)
+
     reversed_data = format_data[::-1]  # Reverse the data for easier processing
     bot_rfd = reversed_data[8:]
 
@@ -187,25 +194,17 @@ def test_encode_matrix(matrix, data):
     return matrix
 
 def apply_mask(matrix):
-    """
-    Apply Mask 0 to the QR matrix, modifying only the data areas.
-
-    Parameters:
-    - matrix (list of lists): The QR matrix with data.
-
-    Returns:
-    - list of lists: The masked QR matrix.
-    """
     size = len(matrix)
 
     for i in range(size):
         for j in range(size):
             # Skip fixed patterns (where matrix cell is None or reserved)
-            if matrix[i][j] is not None:
+            current = matrix[i][j]
+            if current == 2 or current == 3:
                 continue
 
             # Apply Mask 0 condition: (i + j) % 2 == 0
-            if (i + j) % 2 == 0:
+            if i % 2 == 0:
                 matrix[i][j] = 1 if matrix[i][j] == 0 else 0  # Flip module value
 
     return matrix
@@ -222,6 +221,12 @@ def render_matrix_as_image(matrix, box_size, file_name):
                 color = (0, 0, 0)  # Black
             elif matrix[i][j] == 0:  # White modules
                 color = (255, 255, 255)  # White
+            elif matrix[i][j] == 2:  # Finder patterns, timing patterns, etc.
+                #color = (240, 50, 50)  # Red
+                color = (255, 255, 255)  # White
+            elif matrix[i][j] == 3:  # Alignment patterns
+                #color = (50, 50, 240)  # Blue
+                color = (0, 0, 0)  # Black
             else:  # None (unassigned areas)
                 color = (128, 128, 128)  # Gray
             for x in range(box_size):
@@ -279,7 +284,7 @@ print("NEW RESULT LEN:", len(new_result))
 aligned_matrix = create_alignment_matrix()
 #print(np.array(aligned_matrix))
 
-matrix = test_encode_matrix(aligned_matrix, test_result)
+matrix = test_encode_matrix(aligned_matrix, new_result)
 mask_matrix = apply_mask(matrix)
 
 render_matrix_as_image(mask_matrix, box_size=20, file_name="qr_matrix.png")

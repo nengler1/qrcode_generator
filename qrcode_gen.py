@@ -31,15 +31,20 @@ def pad_bytes(encoded_str):
     
     return padding
 
-def add_error_correction(data, total_codewords):
-    rs = reedsolo.RSCodec(total_codewords - len(data) // 8)
-    data_bytes = int(data, 2).to_bytes((len(data) + 7) // 8, "big")
-    encoded_data = rs.encode(data_bytes)
+def hex_to_dec_list(hex_str):
+    dec_str = []
+    for i in range(0, len(hex_str), 2):
+        dec_str.append(int(hex_str[i:i+2], 16))
+    
+    return dec_str
+
+def add_error_correction(dec_list, total_codewords):
+    rs = reedsolo.RSCodec(15)
+    encoded_data = rs.encode(dec_list)
+    print("ENCODED DATA:", encoded_data)
 
     # Convert back to binary string
-    bin_str = ""
-    for byte in encoded_data:
-        bin_str += bin(byte)[2:].zfill(8)
+    bin_str = ''.join(format(byte, '08b') for byte in encoded_data)
     return bin_str
 
 
@@ -181,6 +186,31 @@ def test_encode_matrix(matrix, data):
 
     return matrix
 
+def apply_mask(matrix):
+    """
+    Apply Mask 0 to the QR matrix, modifying only the data areas.
+
+    Parameters:
+    - matrix (list of lists): The QR matrix with data.
+
+    Returns:
+    - list of lists: The masked QR matrix.
+    """
+    size = len(matrix)
+
+    for i in range(size):
+        for j in range(size):
+            # Skip fixed patterns (where matrix cell is None or reserved)
+            if matrix[i][j] is not None:
+                continue
+
+            # Apply Mask 0 condition: (i + j) % 2 == 0
+            if (i + j) % 2 == 0:
+                matrix[i][j] = 1 if matrix[i][j] == 0 else 0  # Flip module value
+
+    return matrix
+
+
 def render_matrix_as_image(matrix, box_size, file_name):
     size = len(matrix)
     img = Image.new("RGB", (size * box_size, size * box_size), "white")
@@ -221,17 +251,35 @@ total = total + pb
 print("TOTAL:", total)
 print("TOTAL LEN:", len(total))
 
+hex_total = hex(int(total, 2))[2:]
+print("HEX TOTAL:", hex_total)
+
+dec_total = hex_to_dec_list(hex_total)
+print("DEC TOTAL:", dec_total)
+
+## -- ##
+
 total_codewords = 55
 
-result = add_error_correction(total, total_codewords)
+result = add_error_correction(dec_total, total_codewords)
 
-print("RESULT:", result)
-print("RESULT LEN:", len(result))
+#print("RESULT:", result)
+#print("RESULT LEN:", len(result))
 
+test_result = "010000011110011010000111010001110100011100000111001100111010001011110010111101101101011011110111010101101110011101000110000101101001011011100110110001101001011011110110111001101101011011110111011001101001011001010111001100101110011000110110111101101101000011101100000100011110110000010001111011000001000111101100000100011110110000010001111011000001000111101100000100011110110000010001111011000001000111101100000100011110110000010001111011000010011111101010100001001001101000010011100011001101110011011100110100001010000011100001000111110110000100101111100111010000000"
+
+#print("REAL RESULT:", test_result)
+#print("REAL RESULT LEN:", len(test_result))
+
+new_result = total + "011011100110001010110111011011010101001011101010010101111001001000010010111101011011110011101100111111101001000110010001"
+
+print("NEW RESULT:", new_result)
+print("NEW RESULT LEN:", len(new_result))
 
 aligned_matrix = create_alignment_matrix()
 #print(np.array(aligned_matrix))
 
-matrix = test_encode_matrix(aligned_matrix, result)
+matrix = test_encode_matrix(aligned_matrix, test_result)
+mask_matrix = apply_mask(matrix)
 
-render_matrix_as_image(matrix, box_size=20, file_name="qr_matrix.png")
+render_matrix_as_image(mask_matrix, box_size=20, file_name="qr_matrix.png")

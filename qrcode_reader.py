@@ -118,13 +118,68 @@ def create_alignment_matrix():
 
 
     return matrix
-'''
 
-def man_matrix(version):
-    dim = 29
 
-    np.array([[0 for _ in range(dim)] for _ in range(dim)])
-'''
+def encode_matrix(matrix, data):
+    size = 29
+    dim = size - 1
+
+    test_data = "0101"
+
+    # Encoded Label
+    idx = 0
+    for i in range(2):
+        for j in range(2):
+            matrix[dim-i][dim-j] = int(data[idx])
+            idx += 1
+
+    
+    # Char Count Indicator
+    idx = 4
+    for i in range(4):
+        for j in range(2):
+            matrix[(dim-2)-i][dim-j] = int(data[idx])
+            idx += 1
+
+    # Data ...
+
+
+    return matrix
+
+def test_encode_matrix(matrix, data):
+    size = 29
+    row = size - 1  # Start from the bottom-right
+    col = size - 1  # Start with the last column
+    direction = -1  # Moving up initially
+    data_index = 0  # Track the current bit of the encoded data
+
+    while col > 0:
+        # Skip the vertical timing column
+        if col == 6:
+            col -= 1
+
+        for _ in range(size):
+            # Place data in the right column of the pair
+            if matrix[row][col] is None and data_index < len(data):
+                matrix[row][col] = int(data[data_index])
+                data_index += 1
+
+            # Move to the left column of the pair
+            if col > 0 and matrix[row][col - 1] is None and data_index < len(data):
+                matrix[row][col - 1] = int(data[data_index])
+                data_index += 1
+
+            # Move up or down depending on direction
+            row += direction
+
+            # If we go out of bounds, switch direction and move to the next column pair
+            if row < 0 or row >= size:
+                row -= direction  # Step back to stay in bounds
+                direction *= -1  # Reverse direction
+                col -= 2  # Move to the next column pair
+                break
+
+    return matrix
 
 def render_matrix_as_image(matrix, box_size, file_name):
     size = len(matrix)
@@ -151,6 +206,7 @@ qr_string = "https://mountainlionmovies.com"
 
 mi = "0100"
 cci = char_count_indicator(qr_string)
+print("CCI:", cci)
 encoded_str = str_to_bin(qr_string)
 
 terminator = "0000"
@@ -173,7 +229,9 @@ print("RESULT:", result)
 print("RESULT LEN:", len(result))
 
 
-matrix = create_alignment_matrix()
-print(np.array(matrix))
+aligned_matrix = create_alignment_matrix()
+#print(np.array(aligned_matrix))
 
-render_matrix_as_image(matrix, box_size=20, file_name="qrcode/qr_matrix.png")
+matrix = test_encode_matrix(aligned_matrix, result)
+
+render_matrix_as_image(matrix, box_size=20, file_name="qr_matrix.png")

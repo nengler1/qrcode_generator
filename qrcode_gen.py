@@ -38,13 +38,43 @@ def hex_to_dec_list(hex_str):
     
     return dec_str
 
-def add_error_correction(dec_list, total_codewords):
-    rs = reedsolo.RSCodec(15)
-    encoded_data = rs.encode(dec_list)
-    print("ENCODED DATA:", encoded_data)
+def dec_list_to_hex(dec_list):
+    hex_list = []
+    for dec in dec_list:
+        if len(str(dec)) == 1:
+            pad_num = str(dec).rjust(2, '0')
+            hex_list.append(pad_num)
+        else:
+            hex_list.append(hex(dec)[2:])
 
-    # Convert back to binary string
-    bin_str = ''.join(format(byte, '08b') for byte in encoded_data)
+    print(hex_list)
+    return hex_list
+
+def add_error_correction(dec_list, total_codewords):
+    # Initialize Reed-Solomon encoder
+    rs = reedsolo.RSCodec(total_codewords)  # 15 error correction codewords
+
+    # Encode data codewords
+    # Ensure the input length matches the expected data codewords
+    data_codewords = dec_list  # Data codewords
+    error_correction_codewords = rs.encode(data_codewords)[-total_codewords:]  # Only the last 15 bytes are parity
+
+    return list(error_correction_codewords)
+
+def dec_list_to_bin(dec_list):
+    bin_list = []
+    for dec in dec_list:
+        bin_list.append(format(dec, 'b'))
+    
+    bin_str = "".join(bin_list)
+    
+    return bin_str
+
+def hex_list_to_bin(hex_list):
+    bin_str = ""
+    for hex_val in hex_list:
+        bin_str += bin(int(hex_val, 16))[2:].zfill(8)
+
     return bin_str
 
 # 0 = 2; 1 = 3
@@ -96,7 +126,7 @@ def create_alignment_matrix():
     l_zero = "111011111000100"
     l_one =  "111001011110011"
     #format_data = "333233333222322"
-    current_mask = l_one
+    current_mask = l_zero
 
     int_fd = [int(char) + 2 for char in current_mask]
     format_data = ''.join(str(num) for num in int_fd)
@@ -204,7 +234,8 @@ def apply_mask(matrix):
                 continue
 
             # Apply Mask 0 condition: (i + j) % 2 == 0
-            if i % 2 == 0:
+            # Apply Mask 1 condition: i % 2 == 0
+            if (i + j) % 2 == 0:
                 matrix[i][j] = 1 if matrix[i][j] == 0 else 0  # Flip module value
 
     return matrix
@@ -237,7 +268,7 @@ def render_matrix_as_image(matrix, box_size, file_name):
     print("QR Matrix outline saved as", file_name)
 
 
-qr_string = "https://mountainlionmovies.com"
+qr_string = "https://www.youtube.com/@OreoYT"
 
 mi = "0100"
 cci = char_count_indicator(qr_string)
@@ -264,22 +295,30 @@ print("DEC TOTAL:", dec_total)
 
 ## -- ##
 
-total_codewords = 55
+total_codewords = 15
 
 result = add_error_correction(dec_total, total_codewords)
 
-#print("RESULT:", result)
-#print("RESULT LEN:", len(result))
+print("RESULT:", result)
+print("RESULT LEN:", len(result))
 
-test_result = "010000011110011010000111010001110100011100000111001100111010001011110010111101101101011011110111010101101110011101000110000101101001011011100110110001101001011011110110111001101101011011110111011001101001011001010111001100101110011000110110111101101101000011101100000100011110110000010001111011000001000111101100000100011110110000010001111011000001000111101100000100011110110000010001111011000001000111101100000100011110110000010001111011000010011111101010100001001001101000010011100011001101110011011100110100001010000011100001000111110110000100101111100111010000000"
+total_list = dec_total + result
 
-#print("REAL RESULT:", test_result)
-#print("REAL RESULT LEN:", len(test_result))
+print("DEC TOTAL:", total_list)
+print("DEC LEN:", len(total_list))
 
-new_result = total + "011011100110001010110111011011010101001011101010010101111001001000010010111101011011110011101100111111101001000110010001"
+result_bin = dec_list_to_bin(result)
+print("BINARY RESULT:", result_bin)
 
-print("NEW RESULT:", new_result)
-print("NEW RESULT LEN:", len(new_result))
+result_hex = hex(int(result_bin, 2))[2:]
+print("RESULT HEX:", result_hex)
+
+hex_total_list = dec_list_to_hex(total_list)
+
+new_result = hex_list_to_bin(hex_total_list) + "0000000"
+
+print("New RESULT:", new_result)
+print("New RESULT LEN:", len(new_result))
 
 aligned_matrix = create_alignment_matrix()
 #print(np.array(aligned_matrix))
@@ -287,4 +326,4 @@ aligned_matrix = create_alignment_matrix()
 matrix = test_encode_matrix(aligned_matrix, new_result)
 mask_matrix = apply_mask(matrix)
 
-render_matrix_as_image(mask_matrix, box_size=20, file_name="qr_matrix.png")
+render_matrix_as_image(mask_matrix, box_size=20, file_name="qr_matrix_yt.png")
